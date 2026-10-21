@@ -5,7 +5,7 @@ on:
 
 permissions:
   contents: read
-щ
+
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -61,8 +61,6 @@ jobs:
           mkdir -p artifacts
           git -C upstream diff > artifacts/dual-esc.patch
 
-          test -s artifacts/dual-esc.patch
-
       - name: Compile Rover firmware
         shell: bash
         run: |
@@ -103,6 +101,7 @@ jobs:
 
           required = ("board_id", "image", "image_size")
           missing = [key for key in required if key not in apj]
+
           if missing:
               raise SystemExit(
                   "Invalid APJ: missing fields: " + ", ".join(missing)
@@ -154,3 +153,11 @@ jobs:
 
           sha256sum artifacts/ardurover.apj artifacts/ardurover.elf \
             > artifacts/SHA256SUMS.txt
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Rover-4.7.2-Pixhawk1-1M-bdshot-dual-ESC
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
