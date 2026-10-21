@@ -5,7 +5,7 @@ on:
 
 permissions:
   contents: read
-
+щ
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -153,7 +153,4 @@ jobs:
           git -C upstream describe --always --tags --dirty \
             > artifacts/upstream-describe.txt
 
-          sha256sum \
-            artifacts/ardurover.apj \
-            artifacts/ardurover.elf \
-            artifacts/dual-esc.p
+                    sha256sum artifacts/ardurover.apj artifacts/ardurover.elf artifacts/dual-esc.patch > artifacts/SHA256SUMS.txt
