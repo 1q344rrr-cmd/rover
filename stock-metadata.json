@@ -1,0 +1,17 @@
+{
+  "board_id": 9,
+  "magic": "APJFWv1",
+  "description": "Firmware for a STM32F427xx board",
+  "summary": "Pixhawk1-1M-bdshot",
+  "version": "0.1",
+  "image_size": 866936,
+  "extf_image_size": 0,
+  "flash_total": 1032192,
+  "image_maxsize": 1032192,
+  "flash_free": 165256,
+  "extflash_total": 0,
+  "extflash_free": 0,
+  "git_identity": "fb773567",
+  "board_revision": 0,
+  "USBID": "0x1209/0x5741"
+}
