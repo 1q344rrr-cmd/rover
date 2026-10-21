@@ -12,37 +12,73 @@ jobs:
     timeout-minutes: 90
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout patch repository
+        uses: actions/checkout@v4
 
-      - name: Fetch upstream
+      - name: Fetch ArduPilot Rover 4.7.2
+        shell: bash
         run: |
-          git clone --branch Rover-4.7.2 --depth 1 --recurse-submodules --shallow-submodules https://github.com/ArduPilot/ardupilot.git upstream
+          set -euo pipefail
+
+          git clone \
+            --branch Rover-4.7.2 \
+            --depth 1 \
+            --recurse-submodules \
+            --shallow-submodules \
+            https://github.com/ArduPilot/ardupilot.git \
+            upstream
+
           test "$(git -C upstream rev-parse --short=8 HEAD)" = "fb773567"
 
-      - name: Install build prerequisites
-        env:
-          SKIP_AP_EXT_ENV: '1'
-          SKIP_AP_GRAPHIC_ENV: '1'
-          SKIP_AP_GIT_CHECK: '1'
-        run: upstream/Tools/environment_install/install-prereqs-ubuntu.sh -y
+          echo "Upstream commit:"
+          git -C upstream log -1 --oneline
 
-      - name: Apply source changes
+      - name: Install build prerequisites
+        shell: bash
+        env:
+          SKIP_AP_EXT_ENV: "1"
+          SKIP_AP_GRAPHIC_ENV: "1"
+          SKIP_AP_GIT_CHECK: "1"
         run: |
+          set -euo pipefail
+          upstream/Tools/environment_install/install-prereqs-ubuntu.sh -y
+
+      - name: Apply dual ESC OSD patch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f tools/patch_dual_esc.py
+
           python3 tools/patch_dual_esc.py upstream
-          sed -i 's/[[:blank:]]*$//' upstream/libraries/AP_OSD/AP_OSD_Screen.cpp upstream/libraries/AP_OSD/AP_OSD.h
+
+          sed -i 's/[[:blank:]]*$//' \
+            upstream/libraries/AP_OSD/AP_OSD_Screen.cpp \
+            upstream/libraries/AP_OSD/AP_OSD.h
+
           git -C upstream diff --check
+
           mkdir -p artifacts
           git -C upstream diff > artifacts/dual-esc.patch
 
-      - name: Compile
+          test -s artifacts/dual-esc.patch
+
+      - name: Compile Rover firmware
         shell: bash
         run: |
+          set -euo pipefail
+
           source ~/.profile
           cd upstream
+
           ./waf configure --board Pixhawk1-1M-bdshot
           ./waf rover -j2
-          cp build/Pixhawk1-1M-bdshot/bin/ardurover.apj ../artifacts/
-          cp build/Pixhawk1-1M-bdshot/bin/ardurover ../artifacts/ardurover.elf
+
+          cp build/Pixhawk1-1M-bdshot/bin/ardurover.apj \
+            ../artifacts/ardurover.apj
+
+          cp build/Pixhawk1-1M-bdshot/bin/ardurover \
+            ../artifacts/ardurover.elf
 
       - name: Validate APJ and record build
         shell: bash
@@ -53,7 +89,9 @@ jobs:
           test -s artifacts/ardurover.elf
 
           python3 - <<'PY'
+          import base64
           import json
+          import zlib
           from pathlib import Path
 
           path = Path("artifacts/ardurover.apj")
@@ -63,32 +101,59 @@ jobs:
           except (OSError, json.JSONDecodeError) as e:
               raise SystemExit(f"Invalid APJ JSON: {e}")
 
-          required = ("board_id", "image", "image_size", "magic", "format_version")
+          required = ("board_id", "image", "image_size")
           missing = [key for key in required if key not in apj]
-
           if missing:
               raise SystemExit(
                   "Invalid APJ: missing fields: " + ", ".join(missing)
               )
 
           if not isinstance(apj["image"], str) or not apj["image"]:
-              raise SystemExit("Invalid APJ: field 'image' is empty")
+              raise SystemExit("Invalid APJ: 'image' is empty")
 
-          image_size = int(apj["image_size"])
-          if image_size <= 0:
-              raise SystemExit("Invalid APJ: image_size must be positive")
+          try:
+              image = zlib.decompress(
+                  base64.b64decode(apj["image"], validate=True)
+              )
+          except Exception as e:
+              raise SystemExit(f"Invalid APJ image payload: {e}")
+
+          expected_size = int(apj["image_size"])
+          actual_size = len(image)
+
+          if expected_size <= 0:
+              raise SystemExit(
+                  f"Invalid APJ: image_size must be positive, got {expected_size}"
+              )
+
+          if actual_size != expected_size:
+              raise SystemExit(
+                  f"Invalid APJ: image_size={expected_size}, "
+                  f"decoded_size={actual_size}"
+              )
 
           print(f"APJ valid: board_id={apj['board_id']}")
-          print(f"APJ format_version={apj['format_version']}")
-          print(f"APJ image_size={image_size}")
+          print(f"APJ decoded image size={actual_size} bytes")
+
+          for key in (
+              "board_revision",
+              "platform",
+              "git_identity",
+              "magic",
+              "description",
+              "summary",
+          ):
+              if key in apj:
+                  print(f"APJ {key}={apj[key]}")
           PY
 
-          git -C upstream rev-parse HEAD > artifacts/upstream-commit.txt
-          sha256sum artifacts/ardurover.apj artifacts/ardurover.elf \
-            > artifacts/SHA256SUMS.txt
+          git -C upstream rev-parse HEAD \
+            > artifacts/upstream-commit.txt
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Rover-4.7.2-Pixhawk1-1M-bdshot-dual-ESC
-          path: artifacts/
-          if-no-files-found: error
+          git -C upstream describe --always --tags --dirty \
+            > artifacts/upstream-describe.txt
+
+          sha256sum \
+            artifacts/ardurover.apj \
+            artifacts/ardurover.elf \
+            artifacts/dual-esc.p
