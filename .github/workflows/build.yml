@@ -35,11 +35,48 @@ jobs:
           ./waf rover -j2
           cp build/Pixhawk1-1M-bdshot/bin/ardurover.apj ../artifacts/
           cp build/Pixhawk1-1M-bdshot/bin/ardurover ../artifacts/ardurover.elf
-      - name: Validate APJ and record build
+            - name: Validate APJ and record build
+        shell: bash
         run: |
-          python3 tools/check_apj.py artifacts/ardurover.apj
+          set -euo pipefail
+
+          test -s artifacts/ardurover.apj
+          test -s artifacts/ardurover.elf
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("artifacts/ardurover.apj")
+
+          try:
+              apj = json.loads(path.read_text(encoding="utf-8"))
+          except (OSError, json.JSONDecodeError) as e:
+              raise SystemExit(f"Invalid APJ JSON: {e}")
+
+          required = ("board_id", "image", "image_size", "magic", "format_version")
+          missing = [key for key in required if key not in apj]
+
+          if missing:
+              raise SystemExit(
+                  "Invalid APJ: missing fields: " + ", ".join(missing)
+              )
+
+          if not isinstance(apj["image"], str) or not apj["image"]:
+              raise SystemExit("Invalid APJ: field 'image' is empty")
+
+          image_size = int(apj["image_size"])
+          if image_size <= 0:
+              raise SystemExit("Invalid APJ: image_size must be positive")
+
+          print(f"APJ valid: board_id={apj['board_id']}")
+          print(f"APJ format_version={apj['format_version']}")
+          print(f"APJ image_size={image_size}")
+          PY
+
           git -C upstream rev-parse HEAD > artifacts/upstream-commit.txt
-          sha256sum artifacts/ardurover.apj > artifacts/SHA256SUMS.txt
+          sha256sum artifacts/ardurover.apj artifacts/ardurover.elf \
+            > artifacts/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: Rover-4.7.2-Pixhawk1-1M-bdshot-dual-ESC
