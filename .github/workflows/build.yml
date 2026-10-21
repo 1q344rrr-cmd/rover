@@ -147,10 +147,10 @@ jobs:
                   print(f"APJ {key}={apj[key]}")
           PY
 
-          git -C upstream rev-parse HEAD \
-            > artifacts/upstream-commit.txt
+          git -C upstream rev-parse HEAD > artifacts/upstream-commit.txt
 
           git -C upstream describe --always --tags --dirty \
             > artifacts/upstream-describe.txt
 
-                    sha256sum artifacts/ardurover.apj artifacts/ardurover.elf artifacts/dual-esc.patch > artifacts/SHA256SUMS.txt
+          sha256sum artifacts/ardurover.apj artifacts/ardurover.elf \
+            > artifacts/SHA256SUMS.txt
