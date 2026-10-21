@@ -46,8 +46,8 @@ for kind in ('temp','rpm'):
     if not field: raise RuntimeError('Missing setting')
     h=h[:field.end()]+'\n    '+field.group().replace('esc_'+kind,'esc2_'+kind)+h[field.end():]
     # Reuse the stock drawing macro in the same conditional compilation scope.
-    call=re.search(r'^[ \t]*DRAW_ITEM\(\s*esc_'+kind+r'\s*\);',s,re.M)
-    if not call: raise RuntimeError('Missing DRAW_ITEM call')
+    call=re.search(r'^[ \t]*DRAW_SETTING\(\s*esc_'+kind+r'\s*\);',s,re.M)
+    if not call: raise RuntimeError('Missing DRAW_SETTING call for esc_'+kind)
     s=s[:call.end()]+'\n'+call.group().replace('esc_'+kind,'esc2_'+kind)+s[call.end():]
 m=re.search(r'AP_Int8\s+esc_index\s*[^;]*;',h)
 if not m: raise RuntimeError('Missing ESC index declaration')
