@@ -34,7 +34,7 @@ jobs:
           ./waf configure --board Pixhawk1-1M-bdshot
           ./waf rover -j2
           cp build/Pixhawk1-1M-bdshot/bin/ardurover.apj ../artifacts/
-          cp build/Pixhawk1-1M-bdshot/bin/ardurover.elf ../artifacts/
+          cp build/Pixhawk1-1M-bdshot/bin/ardurover ../artifacts/ardurover.elf
       - name: Validate APJ and record build
         run: |
           python3 tools/check_apj.py artifacts/ardurover.apj
