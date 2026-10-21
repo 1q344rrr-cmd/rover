@@ -1,24 +1,31 @@
 name: Rover 4.7.2 dual ESC OSD
+
 on:
   workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
   build:
     runs-on: ubuntu-22.04
     timeout-minutes: 90
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Fetch upstream
         run: |
           git clone --branch Rover-4.7.2 --depth 1 --recurse-submodules --shallow-submodules https://github.com/ArduPilot/ardupilot.git upstream
           test "$(git -C upstream rev-parse --short=8 HEAD)" = "fb773567"
+
       - name: Install build prerequisites
         env:
           SKIP_AP_EXT_ENV: '1'
           SKIP_AP_GRAPHIC_ENV: '1'
           SKIP_AP_GIT_CHECK: '1'
         run: upstream/Tools/environment_install/install-prereqs-ubuntu.sh -y
+
       - name: Apply source changes
         run: |
           python3 tools/patch_dual_esc.py upstream
@@ -26,6 +33,7 @@ jobs:
           git -C upstream diff --check
           mkdir -p artifacts
           git -C upstream diff > artifacts/dual-esc.patch
+
       - name: Compile
         shell: bash
         run: |
@@ -35,7 +43,8 @@ jobs:
           ./waf rover -j2
           cp build/Pixhawk1-1M-bdshot/bin/ardurover.apj ../artifacts/
           cp build/Pixhawk1-1M-bdshot/bin/ardurover ../artifacts/ardurover.elf
-            - name: Validate APJ and record build
+
+      - name: Validate APJ and record build
         shell: bash
         run: |
           set -euo pipefail
@@ -77,6 +86,7 @@ jobs:
           git -C upstream rev-parse HEAD > artifacts/upstream-commit.txt
           sha256sum artifacts/ardurover.apj artifacts/ardurover.elf \
             > artifacts/SHA256SUMS.txt
+
       - uses: actions/upload-artifact@v4
         with:
           name: Rover-4.7.2-Pixhawk1-1M-bdshot-dual-ESC
